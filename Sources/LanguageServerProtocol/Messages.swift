@@ -26,6 +26,9 @@ public let builtinRequests: [_RequestType.Type] = [
   CallHierarchyIncomingCallsRequest.self,
   CallHierarchyOutgoingCallsRequest.self,
   CallHierarchyPrepareRequest.self,
+  TypeHierarchyPrepareRequest.self,
+  TypeHierarchySupertypesRequest.self,
+  TypeHierarchySubtypesRequest.self,
   DefinitionRequest.self,
   ImplementationRequest.self,
   ReferencesRequest.self,
@@ -47,12 +50,12 @@ public let builtinRequests: [_RequestType.Type] = [
   RenameRequest.self,
   RegisterCapabilityRequest.self,
   UnregisterCapabilityRequest.self,
+  InlayHintRequest.self,
 
   // MARK: LSP Extension Requests
 
   SymbolInfoRequest.self,
   PollIndexRequest.self,
-  InlayHintsRequest.self,
 ]
 
 /// The set of known notifications.

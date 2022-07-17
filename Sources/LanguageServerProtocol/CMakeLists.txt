@@ -1,4 +1,4 @@
-add_library(LanguageServerProtocol
+add_library(LanguageServerProtocol STATIC
   Cancellation.swift
   Connection.swift
   CustomCodable.swift
@@ -41,7 +41,7 @@ add_library(LanguageServerProtocol
   Requests/HoverRequest.swift
   Requests/ImplementationRequest.swift
   Requests/InitializeRequest.swift
-  Requests/InlayHintsRequest.swift
+  Requests/InlayHintRequest.swift
   Requests/PollIndexRequest.swift
   Requests/PrepareRenameRequest.swift
   Requests/ReferencesRequest.swift
@@ -50,6 +50,9 @@ add_library(LanguageServerProtocol
   Requests/ShowMessageRequest.swift
   Requests/ShutdownRequest.swift
   Requests/SymbolInfoRequest.swift
+  Requests/TypeHierarchyPrepareRequest.swift
+  Requests/TypeHierarchySupertypesRequest.swift
+  Requests/TypeHierarchySubtypesRequest.swift
   Requests/UnregisterCapabilityRequest.swift
   Requests/WorkspaceFoldersRequest.swift
   Requests/WorkspaceSemanticTokensRefreshRequest.swift
@@ -85,6 +88,7 @@ add_library(LanguageServerProtocol
   SupportTypes/TextDocumentItem.swift
   SupportTypes/TextDocumentSaveReason.swift
   SupportTypes/TextEdit.swift
+  SupportTypes/TypeHierarchyItem.swift
   SupportTypes/VersionedTextDocumentIdentifier.swift
   SupportTypes/WindowMessageType.swift
   SupportTypes/WorkspaceEdit.swift
@@ -92,25 +96,6 @@ add_library(LanguageServerProtocol
   SupportTypes/WorkspaceSettings.swift)
 set_target_properties(LanguageServerProtocol PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_Swift_MODULE_DIRECTORY})
-if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
-  if(dispatch_FOUND)
-    target_link_libraries(LanguageServerProtocol PUBLIC
-      swiftDispatch)
-  endif()
-  if(Foundation_FOUND)
-    target_link_libraries(LanguageServerProtocol PUBLIC
-      Foundation)
-  endif()
-endif()
-
-if(BUILD_SHARED_LIBS)
-  get_swift_host_arch(swift_arch)
-  install(TARGETS LanguageServerProtocol
-    ARCHIVE DESTINATION lib/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>/$<LOWER_CASE:${CMAKE_SYSTEM_NAME}>
-    LIBRARY DESTINATION lib/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>/$<LOWER_CASE:${CMAKE_SYSTEM_NAME}>
-    RUNTIME DESTINATION bin)
-  install(FILES
-    $<TARGET_PROPERTY:LanguageServerProtocol,Swift_MODULE_DIRECTORY>/LanguageServerProtocol.swiftdoc
-    $<TARGET_PROPERTY:LanguageServerProtocol,Swift_MODULE_DIRECTORY>/LanguageServerProtocol.swiftmodule
-    DESTINATION lib/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>/$<LOWER_CASE:${CMAKE_SYSTEM_NAME}>/${swift_arch})
-endif()
+target_link_libraries(LanguageServerProtocol PUBLIC
+  $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftDispatch>
+  $<$<NOT:$<PLATFORM_ID:Darwin>>:Foundation>)

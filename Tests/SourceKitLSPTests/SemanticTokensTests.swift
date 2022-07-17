@@ -18,9 +18,6 @@ import XCTest
 
 private typealias Token = SyntaxHighlightingToken
 
-/// The number of seconds that we wait for a semantic token refresh.
-private let semanticRefreshTimeout: TimeInterval = 60
-
 final class SemanticTokensTests: XCTestCase {
   /// Connection and lifetime management for the service.
   private var connection: TestSourceKitServer! = nil
@@ -106,7 +103,7 @@ final class SemanticTokensTests: XCTestCase {
     )))
     version += 1
 
-    wait(for: [registerCapabilityExpectation, refreshExpectation], timeout: semanticRefreshTimeout)
+    wait(for: [registerCapabilityExpectation, refreshExpectation], timeout: defaultTimeout)
   }
 
   private func editDocument(changes: [TextDocumentContentChangeEvent], expectRefresh: Bool = true) {
@@ -128,7 +125,7 @@ final class SemanticTokensTests: XCTestCase {
     ))
     version += 1
 
-    wait(for: expectations, timeout: semanticRefreshTimeout)
+    wait(for: expectations, timeout: defaultTimeout)
   }
 
   private func editDocument(range: Range<Position>, text: String, expectRefresh: Bool = true) {
@@ -202,7 +199,7 @@ final class SemanticTokensTests: XCTestCase {
     """
     openDocument(text: text)
 
-    guard let snapshot = connection.server?.workspace?.documentManager.latestSnapshot(uri) else {
+    guard let snapshot = connection.server?._documentManager.latestSnapshot(uri) else {
       fatalError("Could not fetch document snapshot for \(#function)")
     }
 

@@ -40,6 +40,8 @@ public final class FallbackBuildSystem: BuildSystem {
 
   public var indexDatabasePath: AbsolutePath? { return nil }
 
+  public var indexPrefixMappings: [PathPrefixMapping] { return [] }
+
   public func settings(for uri: DocumentURI, _ language: Language) -> FileBuildSettings? {
     switch language {
     case .swift:
@@ -100,4 +102,8 @@ public final class FallbackBuildSystem: BuildSystem {
   }
 
   public func filesDidChange(_ events: [FileEvent]) {}
+
+  public func fileHandlingCapability(for uri: DocumentURI) -> FileHandlingCapability {
+    return .fallback
+  }
 }

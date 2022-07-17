@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import LanguageServerProtocol
+import LSPTestSupport
 import SKCore
 import SKTestSupport
 import XCTest
@@ -217,7 +218,7 @@ final class SKTests: XCTestCase {
     }
 
     try ws.openDocument(moduleRef.url, language: .swift)
-    let started = XCTWaiter.wait(for: [startExpectation], timeout: 5)
+    let started = XCTWaiter.wait(for: [startExpectation], timeout: defaultTimeout)
     if started != .completed {
       fatalError("error \(started) waiting for initial diagnostics notification")
     }
@@ -238,17 +239,13 @@ final class SKTests: XCTestCase {
     }
     server.filesDependenciesUpdated([DocumentURI(moduleRef.url)])
 
-    let finished = XCTWaiter.wait(for: [finishExpectation], timeout: 5)
+    let finished = XCTWaiter.wait(for: [finishExpectation], timeout: defaultTimeout)
     if finished != .completed {
       fatalError("error \(finished) waiting for post-build diagnostics notification")
     }
   }
 
   func testDependenciesUpdatedCXXTibs() throws {
-    // SR-12378: this is failing occassionally in CI. Disabling while we
-    // investigate and fix.
-#if false
-
     guard let ws = try mutableSourceKitTibsTestWorkspace(name: "GeneratedHeader") else { return }
     defer { withExtendedLifetime(ws) {} } // Keep workspace alive for callbacks.
     guard let server = ws.testServer.server else {
@@ -272,7 +269,7 @@ final class SKTests: XCTestCase {
     // files without a recently upstreamed extension.
     try "".write(to: generatedHeaderURL, atomically: true, encoding: .utf8)
     try ws.openDocument(moduleRef.url, language: .c)
-    let started = XCTWaiter.wait(for: [startExpectation], timeout: 3)
+    let started = XCTWaiter.wait(for: [startExpectation], timeout: defaultTimeout)
     if started != .completed {
       fatalError("error \(started) waiting for initial diagnostics notification")
     }
@@ -291,11 +288,10 @@ final class SKTests: XCTestCase {
     }
     server.filesDependenciesUpdated([DocumentURI(moduleRef.url)])
 
-    let finished = XCTWaiter.wait(for: [finishExpectation], timeout: 3)
+    let finished = XCTWaiter.wait(for: [finishExpectation], timeout: defaultTimeout)
     if finished != .completed {
       fatalError("error \(finished) waiting for post-build diagnostics notification")
     }
-#endif
   }
 
   func testClangdGoToInclude() throws {

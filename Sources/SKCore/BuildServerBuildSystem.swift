@@ -35,6 +35,9 @@ public final class BuildServerBuildSystem {
   public private(set) var indexDatabasePath: AbsolutePath?
   public private(set) var indexStorePath: AbsolutePath?
 
+  // FIXME: Add support for prefix mappings to the Build Server protocol.
+  public var indexPrefixMappings: [PathPrefixMapping] { return [] }
+
   /// Delegate to handle any build system events.
   public weak var delegate: BuildSystemDelegate? {
     get { return self.handler?.delegate }
@@ -221,6 +224,26 @@ extension BuildServerBuildSystem: BuildSystem {
   }
 
   public func filesDidChange(_ events: [FileEvent]) {}
+
+  public func fileHandlingCapability(for uri: DocumentURI) -> FileHandlingCapability {
+    guard let fileUrl = uri.fileURL else {
+      return .unhandled
+    }
+
+    // FIXME: We should not make any assumptions about which files the build server can handle.
+    // Instead we should query the build server which files it can handle (#492).
+    let path = AbsolutePath(fileUrl.path)
+    if projectRoot.isAncestorOfOrEqual(to: path) {
+      return .handled
+    }
+
+    let realpath = resolveSymlinks(path)
+    if realpath != path, projectRoot.isAncestorOfOrEqual(to: realpath) {
+      return .handled
+    }
+
+    return .unhandled
+  }
 }
 
 private func loadBuildServerConfig(path: AbsolutePath, fileSystem: FileSystem) throws -> BuildServerConfig {

@@ -152,7 +152,7 @@ public final class SwiftPMWorkspace {
       log("could not find manifest, or not a SwiftPM package: \(path)", level: .warning)
       return nil
     } catch {
-      log("failed to create \(SwiftPMWorkspace.self): \(error)", level: .error)
+      log("failed to create \(SwiftPMWorkspace.self) at \(url.path): \(error)", level: .error)
       return nil
     }
   }
@@ -222,6 +222,7 @@ extension SwiftPMWorkspace {
       }
     }
     delegate.fileBuildSettingsChanged(changedFiles)
+    delegate.fileHandlingCapabilityChanged()
   }
 }
 
@@ -238,6 +239,8 @@ extension SwiftPMWorkspace: SKCore.BuildSystem {
   public var indexDatabasePath: AbsolutePath? {
     return buildPath.appending(components: "index", "db")
   }
+
+  public var indexPrefixMappings: [PathPrefixMapping] { return [] }
 
   /// **Public for testing only**
   public func _settings(
@@ -345,7 +348,7 @@ extension SwiftPMWorkspace: SKCore.BuildSystem {
     case .created, .deleted:
       return self.workspace.fileAffectsSwiftOrClangBuildSettings(filePath: AbsolutePath(fileURL.path), packageGraph: self.packageGraph)
     case .changed:
-      return false
+      return fileURL.lastPathComponent == "Package.swift"
     default: // Unknown file change type
       return false
     }
@@ -358,6 +361,19 @@ extension SwiftPMWorkspace: SKCore.BuildSystem {
           // TODO: It should not be necessary to reload the entire package just to get build settings for one file.
           try self.reloadPackage()
         }
+      }
+    }
+  }
+
+  public func fileHandlingCapability(for uri: DocumentURI) -> FileHandlingCapability {
+    guard let fileUrl = uri.fileURL else {
+      return .unhandled
+    }
+    return self.queue.sync {
+      if targetDescription(for: AbsolutePath(fileUrl.path)) != nil {
+        return .handled
+      } else {
+        return .unhandled
       }
     }
   }

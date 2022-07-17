@@ -133,24 +133,30 @@ public final class SwiftLanguageServer: ToolchainLanguageServer {
   /// A callback with which `SwiftLanguageServer` can request its owner to reopen all documents in case it has crashed.
   private let reopenDocuments: (ToolchainLanguageServer) -> Void
 
-  /// Creates a language server for the given client using the sourcekitd dylib at the specified
-  /// path.
-  /// `reopenDocuments` is a closure that will be called if sourcekitd crashes and the
-  /// `SwiftLanguageServer` asks its parent server to reopen all of its documents.
-  public init(
+  /// Creates a language server for the given client using the sourcekitd dylib specified in `toolchain`.
+  /// `reopenDocuments` is a closure that will be called if sourcekitd crashes and the `SwiftLanguageServer` asks its parent server to reopen all of its documents.
+  /// Returns `nil` if `sourcektid` couldn't be found.
+  public init?(
     client: LocalConnection,
-    sourcekitd: AbsolutePath,
-    clientCapabilities: ClientCapabilities,
-    serverOptions: SourceKitServer.Options,
+    toolchain: Toolchain,
+    clientCapabilities: ClientCapabilities?,
+    options: SourceKitServer.Options,
+    workspace: Workspace,
     reopenDocuments: @escaping (ToolchainLanguageServer) -> Void
   ) throws {
+    guard let sourcekitd = toolchain.sourcekitd else { return nil }
     self.client = client
     self.sourcekitd = try SourceKitDImpl.getOrCreate(dylibPath: sourcekitd)
-    self.clientCapabilities = clientCapabilities
-    self.serverOptions = serverOptions
+    self.clientCapabilities = clientCapabilities ?? ClientCapabilities(workspace: nil, textDocument: nil)
+    self.serverOptions = options
     self.documentManager = DocumentManager()
     self.state = .connected
     self.reopenDocuments = reopenDocuments
+  }
+
+  public func canHandle(workspace: Workspace) -> Bool {
+    // We have a single sourcekitd instance for all workspaces.
+    return true
   }
 
   public func addStateChangeHandler(handler: @escaping (_ oldState: LanguageServerState, _ newState: LanguageServerState) -> Void) {
@@ -376,7 +382,9 @@ extension SwiftLanguageServer {
           tokenTypes: SyntaxHighlightingToken.Kind.allCases.map(\.lspName),
           tokenModifiers: SyntaxHighlightingToken.Modifiers.allModifiers.map { $0.lspName! }),
         range: .bool(true),
-        full: .bool(true))
+        full: .bool(true)),
+      inlayHintProvider: InlayHintOptions(
+        resolveProvider: false)
     ))
   }
 
@@ -653,14 +661,23 @@ extension SwiftLanguageServer {
       return completion(.failure(.unknown(msg)))
     }
 
+    let helperDocumentName = "DocumentSymbols:" + snapshot.document.uri.pseudoPath
     let skreq = SKDRequestDictionary(sourcekitd: self.sourcekitd)
     skreq[keys.request] = self.requests.editor_open
-    skreq[keys.name] = "DocumentSymbols:" + snapshot.document.uri.pseudoPath
+    skreq[keys.name] = helperDocumentName
     skreq[keys.sourcetext] = snapshot.text
     skreq[keys.syntactic_only] = 1
 
     let handle = self.sourcekitd.send(skreq, self.queue) { [weak self] result in
       guard let self = self else { return }
+
+      defer {
+        let closeHelperReq = SKDRequestDictionary(sourcekitd: self.sourcekitd)
+        closeHelperReq[self.keys.request] = self.requests.editor_close
+        closeHelperReq[self.keys.name] = helperDocumentName
+        _ = self.sourcekitd.send(closeHelperReq, .global(qos: .utility), reply: { _ in })
+      }
+
       guard let dict = result.success else {
         return completion(.failure(ResponseError(result.failure!)))
       }
@@ -750,14 +767,23 @@ extension SwiftLanguageServer {
         return
       }
 
+      let helperDocumentName = "DocumentColor:" + snapshot.document.uri.pseudoPath
       let skreq = SKDRequestDictionary(sourcekitd: self.sourcekitd)
       skreq[keys.request] = self.requests.editor_open
-      skreq[keys.name] = "DocumentColor:" + snapshot.document.uri.pseudoPath
+      skreq[keys.name] = helperDocumentName
       skreq[keys.sourcetext] = snapshot.text
       skreq[keys.syntactic_only] = 1
 
       let handle = self.sourcekitd.send(skreq, self.queue) { [weak self] result in
         guard let self = self else { return }
+
+        defer {
+          let closeHelperReq = SKDRequestDictionary(sourcekitd: self.sourcekitd)
+          closeHelperReq[keys.request] = self.requests.editor_close
+          closeHelperReq[keys.name] = helperDocumentName
+          _ = self.sourcekitd.send(closeHelperReq, .global(qos: .utility), reply: { _ in })
+        }
+
         guard let dict = result.success else {
           req.reply(.failure(ResponseError(result.failure!)))
           return
@@ -956,14 +982,23 @@ extension SwiftLanguageServer {
         return
       }
 
+      let helperDocumentName = "FoldingRanges:" + snapshot.document.uri.pseudoPath
       let skreq = SKDRequestDictionary(sourcekitd: self.sourcekitd)
       skreq[keys.request] = self.requests.editor_open
-      skreq[keys.name] = "FoldingRanges:" + snapshot.document.uri.pseudoPath
+      skreq[keys.name] = helperDocumentName
       skreq[keys.sourcetext] = snapshot.text
       skreq[keys.syntactic_only] = 1
 
       let handle = self.sourcekitd.send(skreq, self.queue) { [weak self] result in
         guard let self = self else { return }
+
+        defer {
+          let closeHelperReq = SKDRequestDictionary(sourcekitd: self.sourcekitd)
+          closeHelperReq[keys.request] = self.requests.editor_close
+          closeHelperReq[keys.name] = helperDocumentName
+          _ = self.sourcekitd.send(closeHelperReq, .global(qos: .utility), reply: { _ in })
+        }
+
         guard let dict = result.success else {
           req.reply(.failure(ResponseError(result.failure!)))
           return
@@ -1214,7 +1249,7 @@ extension SwiftLanguageServer {
     completion(.success(codeActions))
   }
 
-  public func inlayHints(_ req: Request<InlayHintsRequest>) {
+  public func inlayHint(_ req: Request<InlayHintRequest>) {
     guard req.params.only?.contains(.type) ?? true else {
       req.reply([])
       return
@@ -1227,11 +1262,16 @@ extension SwiftLanguageServer {
         let hints = infos
           .lazy
           .filter { !$0.hasExplicitType }
-          .map { info in
-            InlayHint(
-              position: info.range.upperBound,
-              category: .type,
-              label: info.printedType
+          .map { info -> InlayHint in
+            let position = info.range.upperBound
+            let label = ": \(info.printedType)"
+            return InlayHint(
+              position: position,
+              kind: .type,
+              label: .string(label),
+              textEdits: [
+                TextEdit(range: position..<position, newText: label)
+              ]
             )
           }
 
@@ -1399,25 +1439,6 @@ extension DocumentSnapshot {
   func indexOf(utf8Offset: Int) -> String.Index? {
     return text.utf8.index(text.startIndex, offsetBy: utf8Offset, limitedBy: text.endIndex)
   }
-}
-
-func makeLocalSwiftServer(
-  client: MessageHandler,
-  sourcekitd: AbsolutePath,
-  clientCapabilities: ClientCapabilities?,
-  options: SourceKitServer.Options,
-  reopenDocuments: @escaping (ToolchainLanguageServer) -> Void
-) throws -> ToolchainLanguageServer {
-  let connectionToClient = LocalConnection()
-
-  let server = try SwiftLanguageServer(
-    client: connectionToClient,
-    sourcekitd: sourcekitd,
-    clientCapabilities: clientCapabilities ?? ClientCapabilities(workspace: nil, textDocument: nil),
-    serverOptions: options,
-    reopenDocuments: reopenDocuments)
-  connectionToClient.start(handler: client)
-  return server
 }
 
 extension sourcekitd_uid_t {

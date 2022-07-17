@@ -85,9 +85,16 @@ public struct ServerCapabilities: Codable, Hashable {
   /// call hierarchy requests.
   public var callHierarchyProvider: ValueOrBool<TextDocumentAndStaticRegistrationOptions>?
 
+  /// Whether the server provides `textDocument/prepareTypeHierarchy` and related
+  /// type hierarchy requests.
+  public var typeHierarchyProvider: ValueOrBool<TextDocumentAndStaticRegistrationOptions>?
+
   /// Whether the server supports the `textDocument/semanticTokens` family of
   /// requests.
   public var semanticTokensProvider: SemanticTokensOptions?
+
+  /// Whether the server supports the `textDocument/inlayHint` family of requests.
+  public var inlayHintProvider: InlayHintOptions?
 
   public var experimental: LSPAny?
 
@@ -116,7 +123,9 @@ public struct ServerCapabilities: Codable, Hashable {
     executeCommandProvider: ExecuteCommandOptions? = nil,
     workspace: WorkspaceServerCapabilities? = nil,
     callHierarchyProvider: ValueOrBool<TextDocumentAndStaticRegistrationOptions>? = nil,
+    typeHierarchyProvider: ValueOrBool<TextDocumentAndStaticRegistrationOptions>? = nil,
     semanticTokensProvider: SemanticTokensOptions? = nil,
+    inlayHintProvider: InlayHintOptions? = nil,
     experimental: LSPAny? = nil
   )
   {
@@ -144,7 +153,9 @@ public struct ServerCapabilities: Codable, Hashable {
     self.executeCommandProvider = executeCommandProvider
     self.workspace = workspace
     self.callHierarchyProvider = callHierarchyProvider
+    self.typeHierarchyProvider = typeHierarchyProvider
     self.semanticTokensProvider = semanticTokensProvider
+    self.inlayHintProvider = inlayHintProvider
     self.experimental = experimental
   }
 }
@@ -502,6 +513,16 @@ public struct SemanticTokensOptions: Codable, Hashable {
     self.legend = legend
     self.range = range
     self.full = full
+  }
+}
+
+public struct InlayHintOptions: Codable, Hashable {
+  /// The server provides support to resolve additional information
+  /// for an inlay hint item.
+  public var resolveProvider: Bool?
+
+  public init(resolveProvider: Bool? = nil) {
+    self.resolveProvider = resolveProvider
   }
 }
 

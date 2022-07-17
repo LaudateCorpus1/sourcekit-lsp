@@ -140,6 +140,8 @@ extension BuildSystemManager: BuildSystem {
 
   public var indexDatabasePath: AbsolutePath? { queue.sync { buildSystem?.indexDatabasePath } }
 
+  public var indexPrefixMappings: [PathPrefixMapping] { queue.sync { buildSystem?.indexPrefixMappings ?? [] } }
+
   public var delegate: BuildSystemDelegate? {
     get { queue.sync { _delegate } }
     set { queue.sync { _delegate = newValue } }
@@ -348,6 +350,10 @@ extension BuildSystemManager: BuildSystem {
       }
     }
   }
+
+  public func fileHandlingCapability(for uri: DocumentURI) -> FileHandlingCapability {
+    return max(buildSystem?.fileHandlingCapability(for: uri) ?? .unhandled, fallbackBuildSystem?.fileHandlingCapability(for: uri) ?? .unhandled)
+  }
 }
 
 extension BuildSystemManager: BuildSystemDelegate {
@@ -413,6 +419,16 @@ extension BuildSystemManager: BuildSystemDelegate {
       if let delegate = self._delegate {
         self.notifyQueue.async {
           delegate.buildTargetsChanged(changes)
+        }
+      }
+    }
+  }
+
+  public func fileHandlingCapabilityChanged() {
+    queue.async {
+      if let delegate = self._delegate {
+        self.notifyQueue.async {
+          delegate.fileHandlingCapabilityChanged()
         }
       }
     }

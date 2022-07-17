@@ -40,7 +40,7 @@ $ swift build
 
 Install the following dependencies of SourceKit-LSP:
 
-* libsqlite3-dev, libncurses5-dev, python, ninja-build
+* libsqlite3-dev libncurses5-dev python3 ninja-build
 
 ```sh
 $ export PATH="<path_to_swift_toolchain>/usr/bin:${PATH}"
@@ -53,6 +53,23 @@ Setting `PATH` as described above is important even if `<path_to_swift_toolchain
 After building, the server will be located at `.build/debug/sourcekit-lsp`, or a similar path, if you passed any custom options to `swift build`. Editors will generally need to be provided with this path in order to run the newly built server - see [Editors](../Editors) for more information about configuration.
 
 SourceKit-LSP is designed to build against the latest SwiftPM, so if you run into any issue make sure you have the most up-to-date dependencies by running `swift package update`.
+
+### Windows
+
+The user must provide the following dependencies for SourceKit-LSP:
+- SQLite3
+- ninja
+
+```cmd
+> swift build -Xcc -I<absolute path to SQLite header search path> -Xlinker -L<absolute path to SQLite library search path> -Xcc -I%SDKROOT%\usr\include -Xcc -I%SDKROOT%\usr\include\Block
+```
+
+The header and library search paths must be passed to the build by absolute
+path.  This allows the clang importer and linker to find the dependencies.
+
+Additionally, as SourceKit-LSP depends on libdispatch and the Blocks runtime,
+which are part of the SDK, but not in the default search path, need to be
+explicitly added.
 
 ### Docker
 

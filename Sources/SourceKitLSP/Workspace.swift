@@ -42,13 +42,14 @@ public final class Workspace {
   /// The source code index, if available.
   public var index: IndexStoreDB? = nil
 
-  /// Open documents.
-  public let documentManager: DocumentManager = DocumentManager()
+  /// Documents open in the SourceKitServer. This may include open documents from other workspaces.
+  private let documentManager: DocumentManager
 
   /// Language service for an open document, if available.
   var documentService: [DocumentURI: ToolchainLanguageServer] = [:]
 
   public init(
+    documentManager: DocumentManager,
     rootUri: DocumentURI?,
     capabilityRegistry: CapabilityRegistry,
     toolchainRegistry: ToolchainRegistry,
@@ -57,6 +58,7 @@ public final class Workspace {
     index: IndexStoreDB?,
     indexDelegate: SourceKitIndexDelegate?)
   {
+    self.documentManager = documentManager
     self.buildSetup = buildSetup
     self.rootUri = rootUri
     self.capabilityRegistry = capabilityRegistry
@@ -76,6 +78,7 @@ public final class Workspace {
   ///   - clientCapabilities: The client capabilities provided during server initialization.
   ///   - toolchainRegistry: The toolchain registry.
   convenience public init(
+    documentManager: DocumentManager,
     rootUri: DocumentURI,
     capabilityRegistry: CapabilityRegistry,
     toolchainRegistry: ToolchainRegistry,
@@ -109,12 +112,14 @@ public final class Workspace {
       do {
         let lib = try IndexStoreLibrary(dylibPath: libPath.pathString)
         indexDelegate = SourceKitIndexDelegate()
+        let prefixMappings = indexOptions.indexPrefixMappings ?? buildSystem?.indexPrefixMappings ?? []
         index = try IndexStoreDB(
           storePath: storePath.pathString,
           databasePath: dbPath.pathString,
           library: lib,
           delegate: indexDelegate,
-          listenToUnitEvents: indexOptions.listenToUnitEvents)
+          listenToUnitEvents: indexOptions.listenToUnitEvents,
+          prefixMappings: prefixMappings.map { PathMapping(original: $0.original, replacement: $0.replacement) })
         log("opened IndexStoreDB at \(dbPath) with store path \(storePath)")
       } catch {
         log("failed to open IndexStoreDB: \(error.localizedDescription)", level: .error)
@@ -122,6 +127,7 @@ public final class Workspace {
     }
 
     self.init(
+      documentManager: documentManager,
       rootUri: rootUri,
       capabilityRegistry: capabilityRegistry,
       toolchainRegistry: toolchainRegistry,
@@ -140,11 +146,22 @@ public struct IndexOptions {
   /// Override the index-database-path provided by the build system.
   public var indexDatabasePath: AbsolutePath?
 
+  /// Override the index prefix mappings provided by the build system.
+  public var indexPrefixMappings: [PathPrefixMapping]?
+
   /// *For Testing* Whether the index should listen to unit events, or wait for
   /// explicit calls to pollForUnitChangesAndWait().
   public var listenToUnitEvents: Bool
 
-  public init(indexStorePath: AbsolutePath? = nil, indexDatabasePath: AbsolutePath? = nil, listenToUnitEvents: Bool = true) {
+  public init(
+    indexStorePath: AbsolutePath? = nil,
+    indexDatabasePath: AbsolutePath? = nil,
+    indexPrefixMappings: [PathPrefixMapping]? = nil,
+    listenToUnitEvents: Bool = true
+  ) {
+    self.indexStorePath = indexStorePath
+    self.indexDatabasePath = indexDatabasePath
+    self.indexPrefixMappings = indexPrefixMappings
     self.listenToUnitEvents = listenToUnitEvents
   }
 }
